@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 const allWords = [
     "all", "ball", "bed", "big", "book", "box", "boy", "but", "came", "can",
@@ -105,24 +105,50 @@ function MotionTest() {
     const [enemies, setEnemies] = useState([])
     const [input, setInput] = useState("")
     const [shake, setShake] = useState(false)
+
     const [score, setScore] = useState(0)
     const [timeSurvived, setTimeSurvived] = useState(0)
-    const [gameStarted, setGameStarted] = useState(false)
-    const [gameOver, setGameOver] = useState(false)
     const [misses, setMisses] = useState(0)
 
+    const [gameStarted, setGameStarted] = useState(false)
+    const [gameOver, setGameOver] = useState(false)
+
+    const [currentMode, setCurrentMode] = useState("easy")
+    const [wordsDestroyed, setWordsDestroyed] = useState(0)
+    const [stageWordsDestroyed, setStageWordsDestroyed] = useState(0)
+    const [activeLanes, setActiveLanes] = useState(1)
+
+    const [promptMessage, setPromptMessage] = useState("")
+    const promptTimeoutRef = useRef(null)
+
+    const lanePositions = [35, 135, 235]
+    const [finalScore, setFinalScore] = useState(0)
+
+
+    const showPrompt = (message) => {
+        setPromptMessage(message)
+
+        if (promptTimeoutRef.current) {
+            clearTimeout(promptTimeoutRef.current)
+        }
+
+        promptTimeoutRef.current = setTimeout(() => {
+            setPromptMessage("")
+        }, 1800)
+    }
+
     const getCurrentDifficulty = () => {
-        if (score >= 60) return "Hard"
-        if (score >= 15) return "Medium"
+        if (currentMode === "hard") return "Hard"
+        if (currentMode === "medium") return "Medium"
         return "Easy"
     }
 
     const getCurrentWordList = () => {
-        if (score >= 60) {
+        if (currentMode === "hard") {
             return allWords.filter((word) => word.length >= 9)
         }
 
-        if (score >= 15) {
+        if (currentMode === "medium") {
             return allWords.filter((word) => word.length >= 5 && word.length <= 8)
         }
 
@@ -130,9 +156,21 @@ function MotionTest() {
     }
 
     const getPointsForDifficulty = () => {
-        if (score >= 60) return 5
-        if (score >= 15) return 3
+        if (currentMode === "hard") return 5
+        if (currentMode === "medium") return 3
         return 1
+    }
+
+    const getEnemyDuration = () => {
+        let baseDuration = 12
+
+        if (currentMode === "medium") baseDuration = 10
+        if (currentMode === "hard") baseDuration = 8
+
+        const stageSpeedUp = Math.floor(stageWordsDestroyed / 10)
+        const duration = baseDuration - stageSpeedUp
+
+        return Math.max(duration, 4)
     }
 
     useEffect(() => {
@@ -143,16 +181,19 @@ function MotionTest() {
             const randomWord =
                 currentWords[Math.floor(Math.random() * currentWords.length)]
 
+            const randomLane = Math.floor(Math.random() * activeLanes)
+
             const newEnemy = {
                 id: Date.now() + Math.random(),
                 word: randomWord,
+                lane: randomLane,
             }
 
             setEnemies((prev) => [...prev, newEnemy])
         }, 2000)
 
         return () => clearInterval(spawnInterval)
-    }, [gameStarted, gameOver, score])
+    }, [gameStarted, gameOver, currentMode, activeLanes])
 
     useEffect(() => {
         if (!gameStarted || gameOver) return
@@ -166,10 +207,22 @@ function MotionTest() {
 
     useEffect(() => {
         if (misses >= 3) {
+            const final = calculateFinalScore()
+            setFinalScore(final)
+
             setGameOver(true)
             setGameStarted(false)
+            setPromptMessage("")
         }
     }, [misses])
+
+    useEffect(() => {
+        return () => {
+            if (promptTimeoutRef.current) {
+                clearTimeout(promptTimeoutRef.current)
+            }
+        }
+    }, [])
 
     const removeEnemy = (id) => {
         setEnemies((prev) => prev.filter((enemy) => enemy.id !== id))
@@ -183,6 +236,89 @@ function MotionTest() {
         }, 300)
     }
 
+    const handleCorrectWord = (enemyId) => {
+        removeEnemy(enemyId)
+        setScore((prev) => prev + getPointsForDifficulty())
+
+        const nextWordsDestroyed = wordsDestroyed + 1
+        const nextStageWordsDestroyed = stageWordsDestroyed + 1
+
+        setWordsDestroyed(nextWordsDestroyed)
+
+        if (currentMode === "easy") {
+            if (nextStageWordsDestroyed === 10) {
+                setStageWordsDestroyed(nextStageWordsDestroyed)
+                setActiveLanes(2)
+                showPrompt("SECOND LANE OPEN")
+                return
+            }
+
+            if (nextStageWordsDestroyed === 30) {
+                setStageWordsDestroyed(nextStageWordsDestroyed)
+                setActiveLanes(3)
+                showPrompt("THIRD LANE OPEN")
+                return
+            }
+
+            if (nextStageWordsDestroyed >= 50) {
+                setCurrentMode("medium")
+                setStageWordsDestroyed(0)
+                setActiveLanes(1)
+                setEnemies([])
+                showPrompt("MEDIUM MODE")
+                return
+            }
+
+            setStageWordsDestroyed(nextStageWordsDestroyed)
+            return
+        }
+
+        if (currentMode === "medium") {
+            if (nextStageWordsDestroyed === 10) {
+                setStageWordsDestroyed(nextStageWordsDestroyed)
+                setActiveLanes(2)
+                showPrompt("SECOND LANE OPEN")
+                return
+            }
+
+            if (nextStageWordsDestroyed === 30) {
+                setStageWordsDestroyed(nextStageWordsDestroyed)
+                setActiveLanes(3)
+                showPrompt("THIRD LANE OPEN")
+                return
+            }
+
+            if (nextStageWordsDestroyed >= 50) {
+                setCurrentMode("hard")
+                setStageWordsDestroyed(0)
+                setActiveLanes(1)
+                setEnemies([])
+                showPrompt("HARD MODE")
+                return
+            }
+
+            setStageWordsDestroyed(nextStageWordsDestroyed)
+            return
+        }
+
+        // hard mode = final endless phase
+        if (nextStageWordsDestroyed === 10) {
+            setStageWordsDestroyed(nextStageWordsDestroyed)
+            setActiveLanes(2)
+            showPrompt("SECOND LANE OPEN")
+            return
+        }
+
+        if (nextStageWordsDestroyed === 30) {
+            setStageWordsDestroyed(nextStageWordsDestroyed)
+            setActiveLanes(3)
+            showPrompt("THIRD LANE OPEN")
+            return
+        }
+
+        setStageWordsDestroyed(nextStageWordsDestroyed)
+    }
+
     const handleSubmit = (e) => {
         if (e.key === "Enter") {
             const trimmedInput = input.trim().toLowerCase()
@@ -192,8 +328,7 @@ function MotionTest() {
             )
 
             if (match) {
-                removeEnemy(match.id)
-                setScore((prev) => prev + getPointsForDifficulty())
+                handleCorrectWord(match.id)
             } else if (trimmedInput !== "") {
                 triggerShake()
             }
@@ -217,12 +352,47 @@ function MotionTest() {
         setMisses(0)
         setGameOver(false)
         setGameStarted(true)
+
+        setCurrentMode("easy")
+        setWordsDestroyed(0)
+        setStageWordsDestroyed(0)
+        setActiveLanes(1)
+        setFinalScore(0)
+
+        showPrompt("EASY MODE")
     }
 
-    const getEnemyDuration = () => {
-        const speedLevel = Math.floor(score / 5)
-        const duration = 12 - speedLevel
-        return Math.max(duration, 4)
+    const getDifficultyMultiplier = () => {
+        if (currentMode === "hard") return 2.0
+        if (currentMode === "medium") return 1.5
+        return 1.0
+    }
+
+    const getLaneMultiplier = () => {
+        if (activeLanes === 3) return 1.5
+        if (activeLanes === 2) return 1.25
+        return 1.0
+    }
+
+    const getStageMultiplier = () => {
+        if (stageWordsDestroyed >= 30) return 1.3
+        if (stageWordsDestroyed >= 10) return 1.15
+        return 1.0
+    }
+
+    const calculateFinalScore = () => {
+        const baseScore = score
+        const difficultyMultiplier = getDifficultyMultiplier()
+        const laneMultiplier = getLaneMultiplier()
+        const stageMultiplier = getStageMultiplier()
+        const timeBonus = timeSurvived * 2
+        const wordsBonus = wordsDestroyed * 3
+
+        return Math.floor(
+            baseScore * difficultyMultiplier * laneMultiplier * stageMultiplier +
+            timeBonus +
+            wordsBonus
+        )
     }
 
     if (!gameStarted && !gameOver) {
@@ -270,11 +440,22 @@ function MotionTest() {
                 }}
             >
                 <h2 style={{ fontSize: "48px", marginBottom: "20px" }}>Game Over</h2>
-                <p style={{ fontSize: "24px", marginBottom: "10px" }}>
-                    Final Score: {score}
+                <p>Base Score: {score}</p>
+                <p>Time Bonus: {timeSurvived * 2}</p>
+                <p>Words Bonus: {wordsDestroyed * 3}</p>
+
+                <p>Difficulty Multiplier: {getDifficultyMultiplier()}x</p>
+                <p>Lane Multiplier: {getLaneMultiplier()}x</p>
+                <p>Stage Multiplier: {getStageMultiplier()}x</p>
+
+                <p style={{ fontSize: "28px", marginTop: "10px" }}>
+                    Final Score: {finalScore}
                 </p>
                 <p style={{ fontSize: "24px", marginBottom: "10px" }}>
                     Time Survived: {timeSurvived}s
+                </p>
+                <p style={{ fontSize: "24px", marginBottom: "10px" }}>
+                    Words Destroyed: {wordsDestroyed}
                 </p>
                 <p style={{ fontSize: "24px", marginBottom: "30px" }}>
                     Difficulty Reached: {getCurrentDifficulty()}
@@ -297,7 +478,27 @@ function MotionTest() {
         <motion.div
             animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : { x: 0 }}
             transition={{ duration: 0.3 }}
+            style={{ position: "relative" }}
         >
+            {promptMessage && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "45%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        fontSize: "42px",
+                        fontWeight: "bold",
+                        color: "#ffd54a",
+                        pointerEvents: "none",
+                        zIndex: 10,
+                        textShadow: "0 0 12px rgba(0,0,0,0.8)",
+                    }}
+                >
+                    {promptMessage}
+                </div>
+            )}
+
             <div
                 style={{
                     display: "flex",
@@ -312,8 +513,10 @@ function MotionTest() {
                 <div>Score: {score}</div>
                 <div>Time: {timeSurvived}s</div>
                 <div>Misses: {misses}/3</div>
-                <div>Speed Level: {Math.floor(score / 5)}</div>
-                <div>Difficulty: {getCurrentDifficulty()}</div>
+                <div>Mode: {getCurrentDifficulty()}</div>
+                <div>Lanes: {activeLanes}</div>
+                <div>Destroyed: {wordsDestroyed}</div>
+                <div>Stage: {stageWordsDestroyed}/50</div>
             </div>
 
             <input
@@ -332,11 +535,35 @@ function MotionTest() {
                 style={{
                     position: "relative",
                     width: "100%",
-                    height: "200px",
+                    height: "330px",
                     overflow: "hidden",
                     marginTop: "40px",
+                    borderTop: "1px solid #444",
+                    borderBottom: "1px solid #444",
                 }}
             >
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "100px",
+                        left: 0,
+                        width: "100%",
+                        height: "1px",
+                        backgroundColor: activeLanes >= 2 ? "#333" : "transparent",
+                    }}
+                />
+
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "200px",
+                        left: 0,
+                        width: "100%",
+                        height: "1px",
+                        backgroundColor: activeLanes >= 3 ? "#333" : "transparent",
+                    }}
+                />
+
                 {enemies.map((enemy) => (
                     <motion.div
                         key={enemy.id}
@@ -346,7 +573,7 @@ function MotionTest() {
                         onAnimationComplete={() => handleMissedEnemy(enemy.id)}
                         style={{
                             position: "absolute",
-                            top: "50px",
+                            top: `${lanePositions[enemy.lane]}px`,
                             fontSize: "24px",
                             fontWeight: "bold",
                             color: "white",
