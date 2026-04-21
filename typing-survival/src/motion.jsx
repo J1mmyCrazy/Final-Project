@@ -629,17 +629,7 @@ function MotionTest() {
                         Typing Survival
                     </h1>
 
-                    <p
-                        style={{
-                            fontSize: "20px",
-                            lineHeight: 1.6,
-                            color: "#d5d5d5",
-                            marginBottom: "35px",
-                        }}
-                    >
-                        Type the incoming words before they reach the left side.
-                        Build combo, survive the lane increases, and make it to hard mode.
-                    </p>
+
 
                     <div
                         style={{
