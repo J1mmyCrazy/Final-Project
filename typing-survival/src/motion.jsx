@@ -103,7 +103,6 @@ const allWords = [
 
 function MotionTest() {
     const [enemies, setEnemies] = useState([])
-    const [input, setInput] = useState("")
     const [shake, setShake] = useState(false)
 
     const [score, setScore] = useState(0)
@@ -119,11 +118,20 @@ function MotionTest() {
     const [activeLanes, setActiveLanes] = useState(1)
 
     const [promptMessage, setPromptMessage] = useState("")
+    const [activeEnemyId, setActiveEnemyId] = useState(null)
+    const [typedIndex, setTypedIndex] = useState(0)
+
+    const [finalScore, setFinalScore] = useState(0)
+    const [combo, setCombo] = useState(0)
+    const [maxCombo, setMaxCombo] = useState(0)
+    const [wordHadMistake, setWordHadMistake] = useState(false)
+    const [perfectWordsTyped, setPerfectWordsTyped] = useState(0)
+    const [totalWordsCompleted, setTotalWordsCompleted] = useState(0)
+
     const promptTimeoutRef = useRef(null)
 
     const lanePositions = [35, 135, 235]
-    const [finalScore, setFinalScore] = useState(0)
-
+    const MAX_COMBO = 25
 
     const showPrompt = (message) => {
         setPromptMessage(message)
@@ -161,39 +169,135 @@ function MotionTest() {
         return 1
     }
 
+    const getComboMultiplier = (comboValue) => {
+        if (comboValue >= 25) return 5
+        if (comboValue >= 15) return 4
+        if (comboValue >= 10) return 3
+        if (comboValue >= 5) return 2
+        return 1
+    }
+
     const getEnemyDuration = () => {
-        let baseDuration = 12
+        let baseDuration = 8
 
-        if (currentMode === "medium") baseDuration = 10
-        if (currentMode === "hard") baseDuration = 8
+        if (currentMode === "medium") baseDuration = 6.5
+        if (currentMode === "hard") baseDuration = 5
 
-        const stageSpeedUp = Math.floor(stageWordsDestroyed / 10)
+        const stageSpeedUp = Math.floor(stageWordsDestroyed / 8) * 0.5
         const duration = baseDuration - stageSpeedUp
 
-        return Math.max(duration, 4)
+        return Math.max(duration, 2)
+    }
+
+    const getSpawnRate = () => {
+        let baseSpawnRate = 1600
+
+        if (currentMode === "medium") baseSpawnRate = 1300
+        if (currentMode === "hard") baseSpawnRate = 1000
+
+        const stageSpawnBoost = Math.floor(stageWordsDestroyed / 10) * 100
+        const spawnRate = baseSpawnRate - stageSpawnBoost
+
+        return Math.max(spawnRate, 450)
+    }
+
+    const getDifficultyMultiplier = () => {
+        if (currentMode === "hard") return 2.0
+        if (currentMode === "medium") return 1.5
+        return 1.0
+    }
+
+    const getLaneMultiplier = () => {
+        if (activeLanes === 3) return 1.5
+        if (activeLanes === 2) return 1.25
+        return 1.0
+    }
+
+    const getStageMultiplier = () => {
+        if (stageWordsDestroyed >= 30) return 1.3
+        if (stageWordsDestroyed >= 10) return 1.15
+        return 1.0
+    }
+
+    const getAccuracy = () => {
+        if (totalWordsCompleted === 0) return 0
+        return Math.round((perfectWordsTyped / totalWordsCompleted) * 100)
+    }
+
+    const calculateFinalScore = () => {
+        const baseScore = score
+        const difficultyMultiplier = getDifficultyMultiplier()
+        const laneMultiplier = getLaneMultiplier()
+        const stageMultiplier = getStageMultiplier()
+        const timeBonus = timeSurvived * 2
+        const wordsBonus = wordsDestroyed * 3
+        const accuracyBonus = getAccuracy() * 5
+        const comboBonus = maxCombo * 10
+
+        return Math.floor(
+            baseScore * difficultyMultiplier * laneMultiplier * stageMultiplier +
+            timeBonus +
+            wordsBonus +
+            accuracyBonus +
+            comboBonus
+        )
+    }
+
+    const renderWord = (enemy) => {
+        const isActive = enemy.id === activeEnemyId
+
+        return enemy.word.split("").map((letter, index) => {
+            let color = "white"
+
+            if (isActive && index < typedIndex) {
+                color = "#4caf50"
+            } else if (isActive) {
+                color = "#ffd54a"
+            }
+
+            return (
+                <span key={`${enemy.id}-${index}`} style={{ color }}>
+                    {letter}
+                </span>
+            )
+        })
     }
 
     useEffect(() => {
         if (!gameStarted || gameOver) return
 
         const spawnInterval = setInterval(() => {
-            const currentWords = getCurrentWordList()
-            const randomWord =
-                currentWords[Math.floor(Math.random() * currentWords.length)]
+            setEnemies((prev) => {
+                const currentWords = getCurrentWordList()
+                const usedFirstLetters = new Set(
+                    prev.map((enemy) => enemy.word[0].toLowerCase())
+                )
 
-            const randomLane = Math.floor(Math.random() * activeLanes)
+                const availableWords = currentWords.filter(
+                    (word) => !usedFirstLetters.has(word[0].toLowerCase())
+                )
 
-            const newEnemy = {
-                id: Date.now() + Math.random(),
-                word: randomWord,
-                lane: randomLane,
-            }
+                if (availableWords.length === 0) {
+                    return prev
+                }
 
-            setEnemies((prev) => [...prev, newEnemy])
-        }, 2000)
+                const randomWord =
+                    availableWords[Math.floor(Math.random() * availableWords.length)]
+
+                const randomLane = Math.floor(Math.random() * activeLanes)
+
+                const newEnemy = {
+                    id: Date.now() + Math.random(),
+                    word: randomWord,
+                    lane: randomLane,
+                }
+
+                return [...prev, newEnemy]
+            })
+        }, getSpawnRate())
 
         return () => clearInterval(spawnInterval)
-    }, [gameStarted, gameOver, currentMode, activeLanes])
+    }, [gameStarted, gameOver, currentMode, activeLanes, stageWordsDestroyed])
 
     useEffect(() => {
         if (!gameStarted || gameOver) return
@@ -207,14 +311,25 @@ function MotionTest() {
 
     useEffect(() => {
         if (misses >= 3) {
-            const final = calculateFinalScore()
-            setFinalScore(final)
-
+            setFinalScore(calculateFinalScore())
             setGameOver(true)
             setGameStarted(false)
             setPromptMessage("")
+            setActiveEnemyId(null)
+            setTypedIndex(0)
         }
-    }, [misses])
+    }, [
+        misses,
+        score,
+        timeSurvived,
+        wordsDestroyed,
+        currentMode,
+        activeLanes,
+        stageWordsDestroyed,
+        perfectWordsTyped,
+        totalWordsCompleted,
+        maxCombo,
+    ])
 
     useEffect(() => {
         return () => {
@@ -238,7 +353,25 @@ function MotionTest() {
 
     const handleCorrectWord = (enemyId) => {
         removeEnemy(enemyId)
-        setScore((prev) => prev + getPointsForDifficulty())
+        setActiveEnemyId(null)
+        setTypedIndex(0)
+
+        const perfectWord = !wordHadMistake
+        const newCombo = perfectWord ? Math.min(combo + 1, MAX_COMBO) : 0
+        const pointsEarned = getPointsForDifficulty() * getComboMultiplier(newCombo)
+
+        setScore((prev) => prev + pointsEarned)
+        setTotalWordsCompleted((prev) => prev + 1)
+
+        if (perfectWord) {
+            setPerfectWordsTyped((prev) => prev + 1)
+            setCombo(newCombo)
+            setMaxCombo((currentMax) => Math.max(currentMax, newCombo))
+        } else {
+            setCombo(0)
+        }
+
+        setWordHadMistake(false)
 
         const nextWordsDestroyed = wordsDestroyed + 1
         const nextStageWordsDestroyed = stageWordsDestroyed + 1
@@ -265,6 +398,9 @@ function MotionTest() {
                 setStageWordsDestroyed(0)
                 setActiveLanes(1)
                 setEnemies([])
+                setActiveEnemyId(null)
+                setTypedIndex(0)
+                setWordHadMistake(false)
                 showPrompt("MEDIUM MODE")
                 return
             }
@@ -293,6 +429,9 @@ function MotionTest() {
                 setStageWordsDestroyed(0)
                 setActiveLanes(1)
                 setEnemies([])
+                setActiveEnemyId(null)
+                setTypedIndex(0)
+                setWordHadMistake(false)
                 showPrompt("HARD MODE")
                 return
             }
@@ -301,7 +440,6 @@ function MotionTest() {
             return
         }
 
-        // hard mode = final endless phase
         if (nextStageWordsDestroyed === 10) {
             setStageWordsDestroyed(nextStageWordsDestroyed)
             setActiveLanes(2)
@@ -319,35 +457,93 @@ function MotionTest() {
         setStageWordsDestroyed(nextStageWordsDestroyed)
     }
 
-    const handleSubmit = (e) => {
-        if (e.key === "Enter") {
-            const trimmedInput = input.trim().toLowerCase()
-
-            const match = enemies.find(
-                (enemy) => enemy.word.toLowerCase() === trimmedInput
-            )
-
-            if (match) {
-                handleCorrectWord(match.id)
-            } else if (trimmedInput !== "") {
-                triggerShake()
-            }
-
-            setInput("")
-        }
-    }
-
     const handleMissedEnemy = (id) => {
+        if (id === activeEnemyId) {
+            setActiveEnemyId(null)
+            setTypedIndex(0)
+            setWordHadMistake(false)
+            setCombo(0)
+        }
+
         removeEnemy(id)
         triggerShake()
         setMisses((prev) => prev + 1)
     }
 
+    useEffect(() => {
+        if (!gameStarted || gameOver) return
+
+        const handleKeyDown = (e) => {
+            const key = e.key.toLowerCase()
+
+            if (key.length !== 1 || key < "a" || key > "z") return
+
+            if (activeEnemyId === null) {
+                const match = enemies.find(
+                    (enemy) => enemy.word[0].toLowerCase() === key
+                )
+
+                if (match) {
+                    setWordHadMistake(false)
+
+                    if (match.word.length === 1) {
+                        handleCorrectWord(match.id)
+                    } else {
+                        setActiveEnemyId(match.id)
+                        setTypedIndex(1)
+                    }
+                }
+
+                return
+            }
+
+            const activeEnemy = enemies.find((enemy) => enemy.id === activeEnemyId)
+
+            if (!activeEnemy) {
+                setActiveEnemyId(null)
+                setTypedIndex(0)
+                setWordHadMistake(false)
+                return
+            }
+
+            const expectedLetter = activeEnemy.word[typedIndex]?.toLowerCase()
+
+            if (key === expectedLetter) {
+                const newTypedIndex = typedIndex + 1
+
+                if (newTypedIndex >= activeEnemy.word.length) {
+                    handleCorrectWord(activeEnemy.id)
+                } else {
+                    setTypedIndex(newTypedIndex)
+                }
+            } else {
+                setWordHadMistake(true)
+                setCombo(0)
+            }
+        }
+
+        window.addEventListener("keydown", handleKeyDown)
+
+        return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [
+        gameStarted,
+        gameOver,
+        enemies,
+        activeEnemyId,
+        typedIndex,
+        currentMode,
+        wordsDestroyed,
+        stageWordsDestroyed,
+        activeLanes,
+        wordHadMistake,
+        combo,
+    ])
+
     const startGame = () => {
         setEnemies([])
-        setInput("")
         setShake(false)
         setScore(0)
+        setFinalScore(0)
         setTimeSurvived(0)
         setMisses(0)
         setGameOver(false)
@@ -357,72 +553,119 @@ function MotionTest() {
         setWordsDestroyed(0)
         setStageWordsDestroyed(0)
         setActiveLanes(1)
-        setFinalScore(0)
+
+        setActiveEnemyId(null)
+        setTypedIndex(0)
+
+        setCombo(0)
+        setMaxCombo(0)
+        setWordHadMistake(false)
+        setPerfectWordsTyped(0)
+        setTotalWordsCompleted(0)
 
         showPrompt("EASY MODE")
     }
 
-    const getDifficultyMultiplier = () => {
-        if (currentMode === "hard") return 2.0
-        if (currentMode === "medium") return 1.5
-        return 1.0
-    }
+    const goToMainMenu = () => {
+        setEnemies([])
+        setShake(false)
+        setScore(0)
+        setFinalScore(0)
+        setTimeSurvived(0)
+        setMisses(0)
+        setGameOver(false)
+        setGameStarted(false)
 
-    const getLaneMultiplier = () => {
-        if (activeLanes === 3) return 1.5
-        if (activeLanes === 2) return 1.25
-        return 1.0
-    }
+        setCurrentMode("easy")
+        setWordsDestroyed(0)
+        setStageWordsDestroyed(0)
+        setActiveLanes(1)
 
-    const getStageMultiplier = () => {
-        if (stageWordsDestroyed >= 30) return 1.3
-        if (stageWordsDestroyed >= 10) return 1.15
-        return 1.0
-    }
+        setActiveEnemyId(null)
+        setTypedIndex(0)
 
-    const calculateFinalScore = () => {
-        const baseScore = score
-        const difficultyMultiplier = getDifficultyMultiplier()
-        const laneMultiplier = getLaneMultiplier()
-        const stageMultiplier = getStageMultiplier()
-        const timeBonus = timeSurvived * 2
-        const wordsBonus = wordsDestroyed * 3
+        setCombo(0)
+        setMaxCombo(0)
+        setWordHadMistake(false)
+        setPerfectWordsTyped(0)
+        setTotalWordsCompleted(0)
 
-        return Math.floor(
-            baseScore * difficultyMultiplier * laneMultiplier * stageMultiplier +
-            timeBonus +
-            wordsBonus
-        )
+        setPromptMessage("")
     }
 
     if (!gameStarted && !gameOver) {
         return (
             <div
                 style={{
+                    minHeight: "100vh",
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    height: "80vh",
+                    background: "#050505",
                     color: "white",
+                    padding: "20px",
+                    boxSizing: "border-box",
                 }}
             >
-                <h2 style={{ fontSize: "48px", marginBottom: "20px" }}>
-                    Typing Survival
-                </h2>
-                <p style={{ fontSize: "20px", marginBottom: "30px" }}>
-                    Type the words before they reach the left side.
-                </p>
-                <button
-                    onClick={startGame}
+                <div
                     style={{
-                        padding: "12px 24px",
-                        fontSize: "18px",
-                        cursor: "pointer",
+                        width: "100%",
+                        maxWidth: "700px",
+                        background: "#111",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: "20px",
+                        padding: "40px",
+                        textAlign: "center",
+                        boxShadow: "0 0 30px rgba(0,0,0,0.35)",
                     }}
                 >
-                    Start Game
-                </button>
+                    <h1
+                        style={{
+                            fontSize: "56px",
+                            margin: "0 0 20px 0",
+                            color: "#ffd54a",
+                        }}
+                    >
+                        Typing Survival
+                    </h1>
+
+                    <p
+                        style={{
+                            fontSize: "20px",
+                            lineHeight: 1.6,
+                            color: "#d5d5d5",
+                            marginBottom: "35px",
+                        }}
+                    >
+                        Type the incoming words before they reach the left side.
+                        Build combo, survive the lane increases, and make it to hard mode.
+                    </p>
+
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            gap: "15px",
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        <button
+                            onClick={startGame}
+                            style={{
+                                padding: "14px 28px",
+                                fontSize: "18px",
+                                fontWeight: "bold",
+                                cursor: "pointer",
+                                borderRadius: "12px",
+                                border: "none",
+                                background: "#ffd54a",
+                                color: "#111",
+                            }}
+                        >
+                            Start Game
+                        </button>
+                    </div>
+                </div>
             </div>
         )
     }
@@ -431,45 +674,131 @@ function MotionTest() {
         return (
             <div
                 style={{
+                    minHeight: "100vh",
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    height: "80vh",
+                    background: "#050505",
                     color: "white",
+                    padding: "20px",
+                    boxSizing: "border-box",
                 }}
             >
-                <h2 style={{ fontSize: "48px", marginBottom: "20px" }}>Game Over</h2>
-                <p>Base Score: {score}</p>
-                <p>Time Bonus: {timeSurvived * 2}</p>
-                <p>Words Bonus: {wordsDestroyed * 3}</p>
-
-                <p>Difficulty Multiplier: {getDifficultyMultiplier()}x</p>
-                <p>Lane Multiplier: {getLaneMultiplier()}x</p>
-                <p>Stage Multiplier: {getStageMultiplier()}x</p>
-
-                <p style={{ fontSize: "28px", marginTop: "10px" }}>
-                    Final Score: {finalScore}
-                </p>
-                <p style={{ fontSize: "24px", marginBottom: "10px" }}>
-                    Time Survived: {timeSurvived}s
-                </p>
-                <p style={{ fontSize: "24px", marginBottom: "10px" }}>
-                    Words Destroyed: {wordsDestroyed}
-                </p>
-                <p style={{ fontSize: "24px", marginBottom: "30px" }}>
-                    Difficulty Reached: {getCurrentDifficulty()}
-                </p>
-                <button
-                    onClick={startGame}
+                <div
                     style={{
-                        padding: "12px 24px",
-                        fontSize: "18px",
-                        cursor: "pointer",
+                        width: "100%",
+                        maxWidth: "760px",
+                        background: "#111",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: "20px",
+                        padding: "40px",
+                        boxShadow: "0 0 30px rgba(0,0,0,0.35)",
                     }}
                 >
-                    Play Again
-                </button>
+                    <h2
+                        style={{
+                            fontSize: "54px",
+                            margin: "0 0 10px 0",
+                            textAlign: "center",
+                            color: "#ffd54a",
+                        }}
+                    >
+                        Game Over
+                    </h2>
+
+                    <p
+                        style={{
+                            textAlign: "center",
+                            fontSize: "18px",
+                            color: "#cfcfcf",
+                            marginBottom: "30px",
+                        }}
+                    >
+                        You made it to {getCurrentDifficulty()} mode.
+                    </p>
+
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "14px 30px",
+                            fontSize: "18px",
+                            lineHeight: 1.5,
+                            marginBottom: "30px",
+                        }}
+                    >
+                        <div>Base Score: {score}</div>
+                        <div>Time Bonus: {timeSurvived * 2}</div>
+
+                        <div>Words Bonus: {wordsDestroyed * 3}</div>
+                        <div>Accuracy Bonus: {getAccuracy() * 5}</div>
+
+                        <div>Combo Bonus: {maxCombo * 10}</div>
+                        <div>Accuracy: {getAccuracy()}%</div>
+
+                        <div>Perfect Words: {perfectWordsTyped}</div>
+                        <div>Total Completed: {totalWordsCompleted}</div>
+
+                        <div>Max Combo: {maxCombo}</div>
+                        <div>Difficulty Multiplier: {getDifficultyMultiplier()}x</div>
+
+                        <div>Lane Multiplier: {getLaneMultiplier()}x</div>
+                        <div>Stage Multiplier: {getStageMultiplier()}x</div>
+                    </div>
+
+                    <div
+                        style={{
+                            textAlign: "center",
+                            fontSize: "38px",
+                            fontWeight: "bold",
+                            color: "#ffd54a",
+                            marginBottom: "30px",
+                        }}
+                    >
+                        Final Score: {finalScore}
+                    </div>
+
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            gap: "15px",
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        <button
+                            onClick={startGame}
+                            style={{
+                                padding: "14px 24px",
+                                fontSize: "18px",
+                                fontWeight: "bold",
+                                cursor: "pointer",
+                                borderRadius: "12px",
+                                border: "none",
+                                background: "#ffd54a",
+                                color: "#111",
+                            }}
+                        >
+                            Restart Run
+                        </button>
+
+                        <button
+                            onClick={goToMainMenu}
+                            style={{
+                                padding: "14px 24px",
+                                fontSize: "18px",
+                                fontWeight: "bold",
+                                cursor: "pointer",
+                                borderRadius: "12px",
+                                border: "1px solid #3a3a3a",
+                                background: "#1b1b1b",
+                                color: "white",
+                            }}
+                        >
+                            Main Menu
+                        </button>
+                    </div>
+                </div>
             </div>
         )
     }
@@ -501,35 +830,79 @@ function MotionTest() {
 
             <div
                 style={{
+                    position: "absolute",
+                    top: "500px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 15,
+                    textAlign: "center",
+                    pointerEvents: "none",
+                    minWidth: "220px",
+                }}
+            >
+                <div
+                    style={{
+                        fontSize: combo >= 25 ? "100px" : combo >= 10 ? "75px" : "60px",
+                        fontWeight: "bold",
+                        color: combo >= 25 ? "#ff7043" : combo >= 10 ? "#ffb300" : "#ffd54a",
+                        textShadow: "0 0 14px rgba(255, 180, 0, 0.7)",
+                        lineHeight: 1,
+                    }}
+                >
+                    Combo x{combo}
+                </div>
+
+                {combo >= 10 && (
+                    <div
+                        style={{
+                            fontSize: "30px",
+                            color: "#ffcc80",
+                            marginTop: "4px",
+                            letterSpacing: "1px",
+                            lineHeight: 1,
+                        }}
+                    >
+                        HOT STREAK
+                    </div>
+                )}
+            </div>
+
+            <div
+                style={{
                     display: "flex",
-                    gap: "30px",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     marginBottom: "20px",
                     color: "white",
-                    fontSize: "24px",
-                    fontWeight: "bold",
+                    gap: "20px",
                     flexWrap: "wrap",
                 }}
             >
-                <div>Score: {score}</div>
-                <div>Time: {timeSurvived}s</div>
-                <div>Misses: {misses}/3</div>
-                <div>Mode: {getCurrentDifficulty()}</div>
-                <div>Lanes: {activeLanes}</div>
-                <div>Destroyed: {wordsDestroyed}</div>
-                <div>Stage: {stageWordsDestroyed}/50</div>
-            </div>
+                <div
+                    style={{
+                        fontSize: "16px",
+                        color: "#bdbdbd",
+                        fontWeight: "bold",
+                    }}
+                >
+                    Mode: {getCurrentDifficulty()}
+                </div>
 
-            <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleSubmit}
-                placeholder="type word..."
-                style={{
-                    padding: "10px",
-                    fontSize: "18px",
-                    marginBottom: "20px",
-                }}
-            />
+                <div
+                    style={{
+                        display: "flex",
+                        gap: "24px",
+                        fontSize: "22px",
+                        fontWeight: "bold",
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                    }}
+                >
+                    <div>Score: {score}</div>
+                    <div>Misses: {misses}/3</div>
+                    <div>Time: {timeSurvived}s</div>
+                </div>
+            </div>
 
             <div
                 style={{
@@ -537,7 +910,7 @@ function MotionTest() {
                     width: "100%",
                     height: "330px",
                     overflow: "hidden",
-                    marginTop: "40px",
+                    marginTop: "20px",
                     borderTop: "1px solid #444",
                     borderBottom: "1px solid #444",
                 }}
@@ -564,24 +937,30 @@ function MotionTest() {
                     }}
                 />
 
-                {enemies.map((enemy) => (
-                    <motion.div
-                        key={enemy.id}
-                        initial={{ x: 2000 }}
-                        animate={{ x: 0 }}
-                        transition={{ duration: getEnemyDuration(), ease: "linear" }}
-                        onAnimationComplete={() => handleMissedEnemy(enemy.id)}
-                        style={{
-                            position: "absolute",
-                            top: `${lanePositions[enemy.lane]}px`,
-                            fontSize: "24px",
-                            fontWeight: "bold",
-                            color: "white",
-                        }}
-                    >
-                        {enemy.word}
-                    </motion.div>
-                ))}
+                {enemies.map((enemy) => {
+                    const isActive = enemy.id === activeEnemyId
+
+                    return (
+                        <motion.div
+                            key={enemy.id}
+                            initial={{ x: 2000 }}
+                            animate={{ x: 0 }}
+                            transition={{ duration: getEnemyDuration(), ease: "linear" }}
+                            onAnimationComplete={() => handleMissedEnemy(enemy.id)}
+                            style={{
+                                position: "absolute",
+                                top: `${lanePositions[enemy.lane]}px`,
+                                fontSize: "24px",
+                                fontWeight: "bold",
+                                textShadow: isActive ? "0 0 10px rgba(255, 213, 74, 0.8)" : "none",
+                                borderBottom: isActive ? "2px solid #ffd54a" : "none",
+                                paddingBottom: "4px",
+                            }}
+                        >
+                            {renderWord(enemy)}
+                        </motion.div>
+                    )
+                })}
             </div>
         </motion.div>
     )
