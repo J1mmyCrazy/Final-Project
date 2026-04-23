@@ -1,3 +1,10 @@
+// Heads-up display component: shows transient prompts, top info bar and large combo indicator.
+//
+// Props:
+//  - promptMessage: optional center message shown briefly (e.g., "EASY MODE")
+//  - combo: current combo count shown prominently
+//  - currentMode, getCurrentDifficulty: used to display difficulty label
+//  - score, misses, timeSurvived: basic run stats shown in the top bar
 function GameHUD({
                      promptMessage,
                      combo,
@@ -10,6 +17,7 @@ function GameHUD({
     return (
         <>
             {promptMessage && (
+                // Large centered prompt message (non-interactive)
                 <div
                     style={{
                         position: "absolute",
@@ -30,6 +38,7 @@ function GameHUD({
                 </div>
             )}
 
+            {/* Top information bar: shows current mode, score, misses and time */}
             <div
                 style={{
                     position: "absolute",
@@ -79,6 +88,7 @@ function GameHUD({
                 </div>
             </div>
 
+            {/* Large combo indicator at bottom center; style changes as combo increases */}
             <div
                 style={{
                     position: "absolute",
@@ -110,6 +120,7 @@ function GameHUD({
                 </div>
 
                 {combo >= 10 && (
+                    // Text badge for high combo streaks
                     <div
                         style={{
                             fontSize: "30px",

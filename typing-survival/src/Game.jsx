@@ -28,25 +28,33 @@ import useGameLoop from "./hooks/useGameLoop"
 import usePromptMessage from "./hooks/usePromptMessage"
 import useGameAudio from "./hooks/useGameAudio"
 
+// Top-level Game component: coordinates state, input, audio, progression and UI screens.
 function Game() {
+    // --- State: dynamic in-game entities and visual feedback ---
     const [enemies, setEnemies] = useState([])
     const [shake, setShake] = useState(false)
 
+    // --- State: scoring / progress / performance tracking ---
     const [score, setScore] = useState(0)
     const [timeSurvived, setTimeSurvived] = useState(0)
     const [misses, setMisses] = useState(0)
 
+    // --- State: high-level game flow ---
     const [gameStarted, setGameStarted] = useState(false)
     const [gameOver, setGameOver] = useState(false)
     const [introComplete, setIntroComplete] = useState(false)
 
+    // --- State: difficulty / progression ---
     const [currentMode, setCurrentMode] = useState("easy")
     const [wordsDestroyed, setWordsDestroyed] = useState(0)
     const [stageWordsDestroyed, setStageWordsDestroyed] = useState(0)
     const [activeLanes, setActiveLanes] = useState(1)
+
+    // --- State: typing / active target management ---
     const [activeEnemyId, setActiveEnemyId] = useState(null)
     const [typedIndex, setTypedIndex] = useState(0)
 
+    // --- State: end-of-run summary & combo tracking ---
     const [finalScore, setFinalScore] = useState(0)
     const [combo, setCombo] = useState(0)
     const [maxCombo, setMaxCombo] = useState(0)
@@ -54,6 +62,7 @@ function Game() {
     const [perfectWordsTyped, setPerfectWordsTyped] = useState(0)
     const [totalWordsCompleted, setTotalWordsCompleted] = useState(0)
 
+    // --- Audio hooks: play sounds and control music ---
     const {
         playCorrectKey,
         playWrongKey,
@@ -64,6 +73,7 @@ function Game() {
         stopMusic,
     } = useGameAudio()
 
+    // --- Leaderboard hook: fetch / submit scores and UI flow for leaderboard ---
     const {
         showLeaderboard,
         setShowLeaderboard,
@@ -80,6 +90,7 @@ function Game() {
         resetLeaderboardState,
     } = useLeaderboard(finalScore)
 
+    // --- Prompt message hook: small UI messages shown between stages or events ---
     const {
         promptMessage,
         setPromptMessage,
@@ -87,10 +98,12 @@ function Game() {
         clearPrompt,
     } = usePromptMessage()
 
+    // --- Helper: remove an enemy by id from state ---
     const removeEnemy = (id) => {
         setEnemies((prev) => prev.filter((enemy) => enemy.id !== id))
     }
 
+    // --- Helper: trigger a screen shake visual effect briefly ---
     const triggerShake = () => {
         setShake(true)
 
@@ -99,6 +112,8 @@ function Game() {
         }, 300)
     }
 
+    // --- Handler: called when player correctly completes a word ---
+    // Updates score/combo, removes enemy, advances progression and shows prompts when needed.
     const handleCorrectWord = (enemyId) => {
         removeEnemy(enemyId)
         setActiveEnemyId(null)
@@ -113,10 +128,12 @@ function Game() {
         setTotalWordsCompleted((prev) => prev + 1)
 
         if (perfectWord) {
+            // reward perfect-word combo and track max combo
             setPerfectWordsTyped((prev) => prev + 1)
             setCombo(newCombo)
             setMaxCombo((currentMax) => Math.max(currentMax, newCombo))
         } else {
+            // reset combo on imperfect word
             setCombo(0)
         }
 
@@ -127,9 +144,11 @@ function Game() {
 
         setWordsDestroyed(nextWordsDestroyed)
 
+        // Determine progression: maybe open new lane(s), advance difficulty mode, or continue current stage
         const progression = getProgressionResult(currentMode, nextStageWordsDestroyed)
 
         if (progression.type === "lane") {
+            // unlock lanes and show a prompt
             setStageWordsDestroyed(progression.stageWordsDestroyed)
             setActiveLanes(progression.activeLanes)
             showPrompt(progression.prompt)
@@ -137,6 +156,7 @@ function Game() {
         }
 
         if (progression.type === "mode") {
+            // switch difficulty mode, reset enemies and typing state, show prompt
             setCurrentMode(progression.nextMode)
             setStageWordsDestroyed(progression.stageWordsDestroyed)
             setActiveLanes(progression.activeLanes)
@@ -151,6 +171,8 @@ function Game() {
         setStageWordsDestroyed(progression.stageWordsDestroyed)
     }
 
+    // --- Handler: called when an enemy reaches the player (miss) ---
+    // Plays miss audio, resets typing and combo if active target was missed, triggers visual shake.
     const handleMissedEnemy = (id) => {
         playMiss()
 
@@ -166,6 +188,8 @@ function Game() {
         setMisses((prev) => prev + 1)
     }
 
+    // --- Hook: handle keyboard input / typing logic ---
+    // This hook uses the passed callbacks/state to manage typing, key sounds and completion.
     useGameInput({
         gameStarted,
         gameOver,
@@ -188,6 +212,8 @@ function Game() {
         onWordComplete: playWordComplete,
     })
 
+    // --- Hook: main game loop / spawn logic / timers ---
+    // Orchestrates spawning, timers, final score calculation and ending the run.
     useGameLoop({
         gameStarted,
         gameOver,
@@ -215,6 +241,7 @@ function Game() {
         stopMusic,
     })
 
+    // --- Reset functions used when starting/restarting or returning to menu ---
     const resetRunState = () => {
         setEnemies([])
         setShake(false)
@@ -241,9 +268,11 @@ function Game() {
     }
 
     const resetMenuState = () => {
+        // Reset any leaderboard-specific UI state when re-entering menu
         resetLeaderboardState()
     }
 
+    // --- Handlers to manage intro, start game, main menu navigation, leaderboard open/close ---
     const handleIntroReady = () => {
         setIntroComplete(true)
         stopMusic()
@@ -251,6 +280,7 @@ function Game() {
     }
 
     const startGame = () => {
+        // Prepare run state and start gameplay music.
         stopMusic()
         resetRunState()
         resetMenuState()
@@ -261,6 +291,7 @@ function Game() {
     }
 
     const goToMainMenu = () => {
+        // Stop gameplay and return to main menu music / UI.
         stopMusic()
         resetRunState()
         resetMenuState()
@@ -278,11 +309,14 @@ function Game() {
         setShowLeaderboard(false)
     }
 
+    // --- Render logic: show Intro -> Leaderboard -> MainMenu -> GameOver -> Game (HUD + Arena) ---
     if (!introComplete) {
+        // Show intro animation/screen first
         return <IntroScreen onReady={handleIntroReady} />
     }
 
     if (showLeaderboard) {
+        // Leaderboard overlay / screen
         return (
             <LeaderboardScreen
                 leaderboard={leaderboard}
@@ -294,6 +328,7 @@ function Game() {
     }
 
     if (!gameStarted && !gameOver) {
+        // Main menu before a run starts
         return (
             <MainMenu
                 onStart={startGame}
@@ -303,6 +338,7 @@ function Game() {
     }
 
     if (gameOver) {
+        // End-of-run summary and score submission UI
         return (
             <GameOverScreen
                 finalScore={finalScore}
@@ -330,6 +366,7 @@ function Game() {
         )
     }
 
+    // Default in-run UI: HUD (score/combo/prompt) and Arena (enemies, typing targets)
     return (
         <div style={{ position: "relative" }}>
             <GameHUD
