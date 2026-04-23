@@ -1,4 +1,3 @@
-javascript
 import { useEffect, useRef } from "react"
 
 // Custom React hook that manages short SFX and background music with crossfading.
