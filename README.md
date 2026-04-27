@@ -31,30 +31,30 @@ Typing Survival is a real-time typing game where players eliminate incoming word
 
 ## What is still missing
 
-- Currently all features that I wanted are implemented.
-- As for future works there are some things i've consisdered
-  - Adding 2 seperate leaderboards, all time and weekly
-  - aloww backspace/esc to cancel spelling a word you're locked onto
-  - if you miss a word it clear the page to give a chance to recover rather than just continueing
-  - Nerfing the difficulty a liltte, I currently believe the game is a little too hard in its current state
+- Currently, all features I originally planned have been implemented.
+- For future improvements, I’ve considered:
+  - Adding two separate leaderboards (all-time and weekly)
+  - Allowing backspace/escape to cancel the current word lock
+  - Clearing the screen after a missed word to give the player a chance to recover
+  - Slightly reducing the difficulty, as the game feels a bit too hard in its current state
 
 ---
 
 ## Technologies / Libraries Used
 
 Frontend:
-- React/Vite
-- JavaScript 
+- React (Vite)
+- JavaScript
 - motion/react for animations
 
 Backend:
 - Node.js
 - Express.js
-- MongoDB/Mongoose
+- MongoDB (Mongoose)
 
 Deployment:
-- Render for frontend and backend
-- MongoDB Atlas for database
+- Render (frontend and backend)
+- MongoDB Atlas (database)
 
 Other:
 - HTML Audio API for sound and music system
@@ -64,7 +64,7 @@ Other:
 
 ## How to download and run the project
 
-1. Go to the GitHub repository:
+1. Go to the GitHub repository:  
 https://github.com/J1mmyCrazy/Final-Project
 
 2. Click the green **Code** button and copy the HTTPS link.
@@ -120,23 +120,23 @@ The backend is only required for leaderboard functionality.
 
 ## Individual Contribution / Work Summary
 
-I was responsible for implementing the full functionality of the project, including both frontend and backend systems.
+This was an individual project, and I was responsible for all aspects of development.
 
-Key contributions include:
+My work included:
 
-- Designing and building the core gameplay loop
-- Implementing the combo and scoring system
+- Building the core gameplay loop and typing mechanics
+- Implementing the combo and scoring systems
 - Creating dynamic difficulty scaling and lane progression
-- Developing a custom audio system with sound effects and music crossfading
-- Integrating a MongoDB leaderboard with a backend API
+- Developing the audio system with sound effects and background music
+- Integrating a MongoDB leaderboard using a backend API
 - Deploying the full application using Render
 - Managing environment variables and production setup
-- Debugging gameplay systems and improving overall game feel
+- Debugging and refining gameplay and overall feel
 
-Progress was made consistently throughout the project, with commits showing ongoing development in gameplay, UI, audio, backend integration, and deployment.
+Progress was made consistently throughout the project, which is reflected in regular commits and feature updates.
 
 ---
 
 ## Notes on Work Gaps
 
-There were no significant gaps in development longer than four days. I worked on it everyday and pushed once a week my changes when I felt they were ready.
+There were no significant gaps in development longer than four days. I worked on the project regularly and typically pushed updates once I felt features were complete and stable.
