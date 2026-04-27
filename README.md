@@ -64,33 +64,57 @@ Other:
 
 ## How to download and run the project
 
-1. Download or clone the repository.
+1. Go to the GitHub repository:
+https://github.com/J1mmyCrazy/Final-Project
 
-2. Install frontend dependencies:
+2. Click the green **Code** button and copy the HTTPS link.
 
-npm install
+3. Open a terminal and run:
 
-3. Install backend dependencies:
+git clone https://github.com/J1mmyCrazy/Final-Project.git  
+cd Final-Project/typing-survival  
 
-cd backend
-npm install
+4. Install frontend dependencies:
 
-4. Create a .env file inside the backend folder:
+npm install  
 
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
+---
 
-5. Run the backend:
+**Optional (Backend Setup):**  
+Steps 5–7 are only required if you want to run the backend locally for leaderboard functionality.  
+You will need your own MongoDB connection string.
 
-node server.js
+---
 
-6. Run the frontend (from root directory):
+5. Install backend dependencies:
 
-npm run dev
+cd backend  
+npm install  
 
-7. Open the app in your browser:
+6. Create a `.env` file inside the backend folder:
 
-http://localhost:5173
+PORT=5000  
+MONGO_URI=your_mongodb_connection_string  
+
+7. Start the backend:
+
+node server.js  
+
+---
+
+8. Start the frontend (from typing-survival folder in a new terminal):
+
+npm run dev  
+
+9. Open the app in your browser:
+
+http://localhost:5173  
+
+---
+
+**Note:**  
+The game will run locally without the backend.  
+The backend is only required for leaderboard functionality.
 
 ---
 
