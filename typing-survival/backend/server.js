@@ -4,6 +4,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const leaderboardRoutes = require("./routes/leaderboard");
+const suggestionRoutes = require("./routes/suggestions");
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/suggestions", suggestionRoutes);
 
 app.use((req, res) => {
     res.status(404).json({ error: "unknown endpoint" });

@@ -34,6 +34,7 @@ function useGameLoop({
         const spawnInterval = setInterval(() => {
             setEnemies((prev) => {
                 const currentWords = getCurrentWordList(currentMode, allWords)
+
                 const usedFirstLetters = new Set(
                     prev.map((enemy) => enemy.word[0].toLowerCase())
                 )
@@ -46,10 +47,31 @@ function useGameLoop({
                     return prev
                 }
 
+                const laneCounts = Array.from({ length: activeLanes }, (_, lane) => {
+                    return prev.filter((enemy) => enemy.lane === lane).length
+                })
+
+                const availableLanes = laneCounts
+                    .map((count, lane) => ({ count, lane }))
+                    .filter(({ count }) => count < 2)
+
+                if (availableLanes.length === 0) {
+                    return prev
+                }
+
+                const bestLaneCount = Math.min(
+                    ...availableLanes.map(({ count }) => count)
+                )
+
+                const bestLanes = availableLanes.filter(
+                    ({ count }) => count === bestLaneCount
+                )
+
+                const randomLane =
+                    bestLanes[Math.floor(Math.random() * bestLanes.length)].lane
+
                 const randomWord =
                     availableWords[Math.floor(Math.random() * availableWords.length)]
-
-                const randomLane = Math.floor(Math.random() * activeLanes)
 
                 const newEnemy = {
                     id: Date.now() + Math.random(),
@@ -98,6 +120,7 @@ function useGameLoop({
                     maxCombo,
                 })
             )
+
             setGameOver(true)
             setGameStarted(false)
             setPromptMessage("")

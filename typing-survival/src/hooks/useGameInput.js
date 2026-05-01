@@ -27,6 +27,17 @@ function useGameInput({
         const handleKeyDown = (e) => {
             const key = e.key.toLowerCase()
 
+            // ESC or Backspace cancels the current active word only
+            if (e.key === "Escape" || e.key === "Backspace") {
+                if (activeEnemyId !== null) {
+                    setActiveEnemyId(null)
+                    setTypedIndex(0)
+                    setWordHadMistake(false)
+                }
+
+                return
+            }
+
             if (key.length !== 1 || key < "a" || key > "z") return
 
             if (activeEnemyId === null) {

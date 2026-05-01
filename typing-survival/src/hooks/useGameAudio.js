@@ -27,9 +27,9 @@ export default function useGameAudio() {
         missRef.current = new Audio("/audio/miss.wav")
 
         correctKeyRef.current.volume = 0.25
-        wrongKeyRef.current.volume = 0.25
+        wrongKeyRef.current.volume = .7
         wordCompleteRef.current.volume = 0.35
-        missRef.current.volume = 0.35
+        missRef.current.volume = 1
 
         musicA.current = new Audio()
         musicB.current = new Audio()
